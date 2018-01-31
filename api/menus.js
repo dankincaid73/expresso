@@ -1,8 +1,9 @@
 const express = require('express');
-const sqlite3 = require('sqlite3');
 const menusRouter = express.Router();
-const db = new sqlite3.Database(process.env.TEST_DATABASE
-|| './database.sqlite');
+const sqlite3 = require('sqlite3');
+const db = new sqlite3.Database(process.env.TEST_DATABASE || './database.sqlite');
+const menuItemsRouter = require('./menuitems.js');
+menusRouter.use('/:menuId/menu-items', menuItemsRouter);
 
 // Check if Menu with given Id exists
 menusRouter.param('menuId', (req, res, next, menuId) => {
@@ -37,7 +38,7 @@ menusRouter.get('/:menuId', (req, res, next) => {
   res.status(200).json({menu: req.menu});
 });
 
-// POST a new Menu
+// POST A New Menu
 menusRouter.post('/', (req, res, next) => {
   const title = req.body.menu.title;
 
@@ -89,9 +90,27 @@ menusRouter.put('/:menuId', (req, res, next) => {
   });
 });
 
-// DELETE a Menu
+//DELETE Menu only if it has no associated Menu Items
 menusRouter.delete('/:menuId', (req, res, next) => {
+  const menuSql = 'SELECT * FROM MenuItem WHERE menu_id = $menuId';
+  const menuItemsValues = {$menuId: req.params.menuId};
+  db.get(menuSql, menuItemsValues, (error, menuItems) => {
+    if (error) {
+      next(error);
+    } else if (menuItems) {
+      res.sendStatus(400);
+    } else {
+      const deleteSql = 'DELETE FROM Menu WHERE Menu.id = $menuId';
+      const deleteValue = {$menuId: req.params.menuId};
 
+      db.get(deleteSql, deleteValue, (error) => {
+        if (error) {
+          next(error);
+        }
+          res.status(204).send();
+      });
+    }
+  });
 });
 
 module.exports = menusRouter;
